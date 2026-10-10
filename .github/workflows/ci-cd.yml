@@ -1,0 +1,131 @@
+name: CI-CD EcoSmart
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------ 1) BUILD + TESTES
+  build-test:
+    name: Build e testes (Maven)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build e testes automatizados
+        run: mvn -B verify
+
+      - name: Publicar relatorio de testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-testes
+          path: target/surefire-reports/
+
+      - name: Publicar o .jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosmart-api-jar
+          path: target/ecosmart-api.jar
+
+  # ------------------------------------------------------------------ 2) IMAGEM DOCKER
+  docker:
+    name: Build da imagem Docker (e push no GHCR)
+    needs: build-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir nome da imagem (GHCR exige minusculas)
+        id: meta
+        run: |
+          REPO="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "repo=${REPO}" >> "$GITHUB_OUTPUT"
+          echo "image=${REPO}:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (e push fora de PR)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ steps.meta.outputs.repo }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ------------------------------------------------------------------ 3) DEPLOY STAGING
+  deploy-staging:
+    name: Deploy em STAGING
+    if: github.event_name != 'pull_request'
+    needs: docker
+    # Por padrao roda no runner do GitHub (deploy efemero, validado por smoke tests).
+    # Para um deploy persistente, crie a variavel DEPLOY_RUNNER com o label de um self-hosted runner.
+    runs-on: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
+    environment: staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy staging
+        env:
+          APP_IMAGE: ${{ needs.docker.outputs.image }}
+          MONGO_PASSWORD: ${{ secrets.MONGO_PASSWORD || 'senhaStaging123' }}
+        run: ./scripts/deploy.sh staging
+
+  # ------------------------------------------------------------------ 4) DEPLOY PRODUCAO
+  deploy-production:
+    name: Deploy em PRODUCAO
+    needs: [docker, deploy-staging]
+    runs-on: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
+    # Configure "Required reviewers" no environment 'production' para exigir aprovacao manual
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy producao
+        env:
+          APP_IMAGE: ${{ needs.docker.outputs.image }}
+          MONGO_PASSWORD: ${{ secrets.MONGO_PASSWORD || 'senhaProducao123' }}
+        run: ./scripts/deploy.sh production

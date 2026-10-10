@@ -1,0 +1,48 @@
+# Aplicacao (Spring Boot) + banco (MongoDB)
+# Uso local:  cp .env.example .env && docker compose up --build -d
+services:
+  mongo:
+    image: mongo:7
+    container_name: ${COMPOSE_PROJECT_NAME:-ecosmart}-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-ecosmart}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?defina MONGO_PASSWORD no .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-ecosmart_porto_verde}
+    volumes:
+      - mongo-data:/data/db          # dados persistem entre reinicios
+    networks:
+      - backend                      # banco NAO expoe porta para fora
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  app:
+    build: .
+    image: ${APP_IMAGE:-ecosmart-api:local}
+    container_name: ${COMPOSE_PROJECT_NAME:-ecosmart}-app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy   # app so sobe quando o Mongo responde
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      SEED_DATA: ${SEED_DATA:-true}
+      MONGO_URI: mongodb://${MONGO_USER:-ecosmart}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DB:-ecosmart_porto_verde}?authSource=admin
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - app-logs:/app/logs           # logs persistentes
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  app-logs:
