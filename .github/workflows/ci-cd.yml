@@ -25,15 +25,17 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Build e testes automatizados
+      - name: Build e testes automatizados (unitarios, API, contrato e BDD)
         run: mvn -B verify
 
-      - name: Publicar relatorio de testes
+      - name: Publicar relatorios de testes (JUnit + Cucumber)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: relatorio-testes
-          path: target/surefire-reports/
+          path: |
+            target/surefire-reports/
+            target/cucumber-reports/
 
       - name: Publicar o .jar
         uses: actions/upload-artifact@v4

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Leitura de consumo (leituras_consumo)",
+  "type": "object",
+  "required": [
+    "id",
+    "atributos"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sensorId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unidadeId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tipoMedida": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "valor": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "timestamp": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "atributos": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

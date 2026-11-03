@@ -108,6 +108,40 @@ Estratégias adotadas:
 - **Usuário não-root** e **HEALTHCHECK** via Actuator.
 - **Compose**: rede `backend` (o MongoDB não expõe porta ao host), volumes `mongo-data` e `app-logs`, variáveis de ambiente via `.env`, `depends_on` com `service_healthy` (a API só sobe depois que o Mongo responde).
 
+## Testes automatizados (BDD + API + contrato)
+
+Os testes rodam **sem Docker e sem MongoDB** (repositórios em memória), então são rápidos e executam igual na máquina do aluno e no pipeline.
+
+| Tipo | Onde | O que valida |
+|---|---|---|
+| **BDD (Cucumber + Gherkin)** | `src/test/resources/features/*.feature` + `src/test/java/.../bdd` | 29 execuções de cenário (26 blocos), positivos (`@positivo`) e negativos (`@negativo`), por pilar ESG (`@ambiental`, `@social`, `@governanca`) |
+| **API (JUnit 5)** | `src/test/java/.../api` | Status code e corpo JSON de **todos** os endpoints: CRUD das 5 collections, `/api/alertas/abertos` e `/api/ambiente` |
+| **Contrato (JSON Schema)** | `src/test/resources/schemas/*.schema.json` | O JSON de cada resposta respeita o contrato (campos, tipos, sem campos extras) |
+| Unitários de controller | `src/test/java/.../controller` | Controllers isolados com Mockito |
+
+### Como executar
+
+```bash
+mvn -B verify                                   # roda tudo (unitários, API, contrato e BDD)
+mvn test -Dtest=RunCucumberTest                 # somente os cenários BDD
+mvn test -Dtest=ApiContratoTest                 # somente os testes de API/contrato
+mvn test -Dtest=RunCucumberTest -Dcucumber.filter.tags="@negativo"   # somente cenários negativos
+mvn test -Dtest=RunCucumberTest -Dcucumber.filter.tags="@social"     # somente o pilar Social
+```
+
+Relatórios gerados em `target/`: `surefire-reports/` (JUnit) e `target/cucumber-reports/cucumber.html` (abra no navegador).
+No GitHub Actions, o job **Build e testes (Maven)** executa `mvn -B verify` e publica os dois relatórios como artefato `relatorio-testes`.
+
+### Exemplo de cenário (Gherkin)
+
+```gherkin
+# language: pt
+@negativo
+Cenário: Consultar um sensor que não existe
+  Quando eu envio GET para "/api/sensores/NAO_EXISTE"
+  Então o status da resposta deve ser 404
+```
+
 ## Prints do funcionamento
 
 > Substitua os marcadores abaixo pelos seus prints (salve em `docs/prints/`).
@@ -125,7 +159,7 @@ Links (preencha): Repositório: `<link>` · Execução do pipeline: `<link>`
 
 ## Tecnologias utilizadas
 
-Java 21 · Spring Boot 3.3 (Web, Data MongoDB, Actuator) · MongoDB 7 · Maven · JUnit 5 + Mockito + MockMvc · Docker (multi-stage) · Docker Compose · GitHub Actions · GitHub Container Registry (GHCR).
+Java 21 · Spring Boot 3.3 (Web, Data MongoDB, Actuator) · MongoDB 7 · Maven · JUnit 5 + Mockito + MockMvc + Cucumber (BDD/Gherkin) + JSON Schema (networknt) · Docker (multi-stage) · Docker Compose · GitHub Actions · GitHub Container Registry (GHCR).
 
 ## Checklist de entrega
 

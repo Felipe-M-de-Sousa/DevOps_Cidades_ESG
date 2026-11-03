@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Alerta automatico (alertas_automaticos)",
+  "type": "object",
+  "required": [
+    "id",
+    "atributos"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sensorId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unidadeId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tipoAlerta": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "severidade": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "atributos": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
